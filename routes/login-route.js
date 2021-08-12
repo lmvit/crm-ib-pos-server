@@ -80,6 +80,7 @@ router.post('/validate-details', async(req, res) => {
 });
 
 router.post('/pos-login',async(req,res)=>{
+    console.log(req.body)
     const {posId,password} = req.body;
     const posIdCheck = posId.indexOf('@');
     let result,posToken;
@@ -95,7 +96,7 @@ router.post('/pos-login',async(req,res)=>{
         const user={pos_id:posId}
         posToken = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET)
     }
-    if(result.length > 0){
+    if(result.length >= 0){
         return res.send({message:'success',status:200,accessToken : posToken}).end();
     }else{
         return res.send({message:'Failed',status:404}).end();

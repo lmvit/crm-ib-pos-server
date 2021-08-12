@@ -20,9 +20,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use('/api/pos/login',posLoginRoutes);
 app.use('/api/pos/customer',posCustomerRoutes);
-// app.use('/api/pos/lifeInsuranceTransaction',posLifeInsurancTransactionRoutes);
 app.use('/api/life-transactions',lifeTransactions);
-
+app.use('/api/general-transactions',generalTransactions);
 
 app.use(express.static(path.join(__dirname, 'public')));
 

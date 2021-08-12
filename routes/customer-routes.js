@@ -5,8 +5,8 @@ const jwt = require('jsonwebtoken');
 
 router.post('/customer-details/exists',async(req,res)=>{
     try {
-        const {aadhar,posId} = req.body;
-        const request = await(await Database.DB.query(`select aadhar_number = ${aadhar} from pos_customers where pos_id = '${posId}'`)).rows;
+        const {aadhar,posId,pancard} = req.body;
+        const request = await(await Database.DB.query(`select aadhar_number = ${aadhar} and pancard = '${pancard}' from pos_customers where pos_id = '${posId}'`)).rows;
         const exists = request.filter(e => {
             if (Object.values(e).toString() === "true") {
                 return true;
@@ -24,8 +24,8 @@ router.post('/customer-details/exists',async(req,res)=>{
 
 router.post('/update-customer-details/exists',async(req,res)=>{
     try {
-        const {aadhar,posId,customerId} = req.body;
-        const exists = await(await Database.DB.query(`select aadhar_number = ${aadhar}  from pos_customers where pos_id = '${posId}' and customer_id != '${customerId}'`)).rows;
+        const {aadhar,posId,customerId,pancard} = req.body;
+        const exists = await(await Database.DB.query(`select aadhar_number = ${aadhar} and pancard = '${pancard}'  from pos_customers where pos_id = '${posId}' and customer_id != '${customerId}'`)).rows;
         if (exists) {
             res.send(`not found`).end();
         } else {
@@ -148,5 +148,16 @@ router.get('/get-branches/:branch', async (req, res) => {
         console.log(error);
     }
 });
+
+router.post('/pan-number', async(request, response) => {
+    try{
+        // console.log(request.body);
+        const responseData = await ( await Database.DB.query(`select * from pos_customers where pancard =  '${request.body.pan_number}' and pos_id = '${request.body.pos_id}'`)).rows;
+        responseData[0] ? response.status(200).json({message: "Customer exist", status: 200, data: responseData[0]}).end() :  response.status(200).send({message : "Customer does not exist", status : 302}).end();
+    } catch (error) {
+        console.log(error);
+        response.status(500).json({message: error.message})
+    }
+})
 
 module.exports = router;

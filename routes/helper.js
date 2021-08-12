@@ -45,7 +45,7 @@ const getDependentEmployees =async (id, onlyIds) => {
     const totalEmployees  = [];
     let fetchedEmployees = [];
 
-    const headEmployee = await( await DataBase.DB.query(`select firstname, lastname, employee_id from employees where employee_id = ${id}`)).rows;
+    const headEmployee = await( await DataBase.DB.query(`select first_name, last_name, pos_id from pos_details where pos_id = ${id}`)).rows;
     headEmployee[0] && totalEmployees.push(headEmployee)
 
     fetchedEmployees = await ( await DataBase.DB.query(`select firstname, lastname, employee_id from employees where concern_manager_id = ${id}`)).rows;
@@ -67,5 +67,8 @@ const getDependentEmployees =async (id, onlyIds) => {
     }
     return mergedEmployees = [].concat.apply([], totalEmployees);
 }
+const  getDetails = async(colName,str,posId)=>{
+     return await(await DataBase.DB.query(`select * from pos_customers where ${colName} = '${str}' and pos_id = '${posId}'`)).rows;
+}
 
-module.exports = { getDependentEmployees, queryFunction, panQueryFunction}
+module.exports = { getDependentEmployees, queryFunction, panQueryFunction,getDetails}

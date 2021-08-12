@@ -3,18 +3,16 @@ const DataBase = require('../Database');
 const format = require('date-fns/format');
 const { getDependentEmployees, queryFunction } = require('./helper');
 
-
-
 router.post('/add-transaction', async (request, response) => {
-    
+    // console.log(request.body);
     let valueIndex = () => {
         return Object.values(request.body).map((item, index) => `$${index+1}`).join(', ');
     }
-
     try {
-        const responseData = await ( await DataBase.DB.query(`insert into general_insurance_transactions(${Object.keys(request.body).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(request.body))).rows;
+        const responseData = await ( await DataBase.DB.query(`insert into pos_general_insurance_transactions(${Object.keys(request.body).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(request.body))).rows;
         responseData[0] ? response.status(200).json({message: 'Customer added successfully',  transaction_id: responseData[0].id}).end() : response.status(500).json({message : "Something went wrong while inserting data"})
     } catch (error) {
+        console.log(error);
         response.status(404).json({message: "Error, Something went wrong while adding transaction, please try again", status : 404}).end();
     }
 })
@@ -24,7 +22,7 @@ router.post('/general-insurance-transactions-data-select', async (request, respo
 
     const value = request.body.customer_mobile ? `customer_mobile =  '${request.body.customer_mobile}'` :  `customer_aadhar = '${request.body.customer_aadhar}'`
         try{
-            const responseData = await ( await DataBase.DB.query(`select * from general_insurance_transactions where ${value} `)).rows;
+            const responseData = await ( await DataBase.DB.query(`select * from pos_general_insurance_transactions where ${value} `)).rows;
              responseData[0] ? response.status(200).json({message: "Customer exist", status: 200, data: responseData[0]}).end() :  response.status(200).json({message : "Customer does not exist", status : 302}).end();
             } catch (error) {
                 response.status(400).json({message: "Error, Something went wrong while fetching transaction details"}).end();
@@ -35,7 +33,7 @@ router.post('/general-insurance-transactions-data-select', async (request, respo
 router.get('/companies',  async (request, response) =>{
     try {
         const responseData = await( await DataBase.DB.query('select * from generalinsurancerevenuedetails')).rows;
-        console.log(responseData)
+        // console.log(responseData)
         responseData[0] ? response.status(200).json({message: "Fetched list of companies",  data: responseData}).end() :  response.status(400).json({message : "No compaines found"}).end();
     } catch (error) {
         response.status(500).json({message: "Error, Something went wrong while fetching companies"}).end();
@@ -44,7 +42,9 @@ router.get('/companies',  async (request, response) =>{
 
 router.post('/products',  async (request, response) =>{
     try {  
+        console.log(request.body)
         const responseData = await( await DataBase.DB.query(`select product_name from generalinsuranceproduct where company_name = '${request.body.company_name}'`)).rows;
+        console.log(responseData)
         responseData[0] ? response.status(200).json({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).json({message : "Something went wrong", status : 500}).end();
     } catch (error) {
         response.status(404).json({message: "Error, Something went wrong while fetching Life products", status : 404}).end();
@@ -90,7 +90,7 @@ router.post('/revenue',  async (request, response) =>{
 
 router.get('/pending-transactions/:id', async (request, response) => {
     try{
-        const responseData = await ( await  DataBase.DB.query(`select * from general_insurance_transactions where policy_number = '' or stage = '' or policy_form is NULL `)).rows;
+        const responseData = await ( await  DataBase.DB.query(`select * from pos_general_insurance_transactions where policy_number = '' or stage = '' or policy_form is NULL and pos_id='${request.params.id}'`)).rows;
         response.status(200).json({customerArray : responseData})
     }catch (error) {
         response.status(500).json({message : 'Something went wrong, while fetching pending transactions'})
@@ -105,26 +105,19 @@ router.get('/dependent-transactions/:id', async (request, response) => {
 
 router.post('/transactions-between-dates/:id', async (request, response) => {
     try {
-        const employees = await getDependentEmployees(request.params.id);
-        const responseData = await ( await DataBase.DB.query(`select * from customers where  date_of_entry >= '${format(new Date(request.body.start_date), 'yyyy-MM-dd')}' and date_of_entry  <= '${format(new Date(request.body.end_date), 'yyyy-MM-dd')} )' and ${queryFunction( employees, 'employee_id')} `)).rows;
+        const pos_id = request.params.id;
+        const {start_date,end_date} =request.body;
+        const responseData = await ( await DataBase.DB.query(`select * from pos_customers where pos_id = '${pos_id}' and submitted_date between '${start_date}' and '${end_date}'`)).rows;
         responseData[0] ? response.status(200).json({message: "Customer exist", data: responseData}).end() :  response.status(200).json({message : "Something went wrong", status : 500}).end();
     } catch (error) {
+        console.log(error);
         response.status(500).json({message: error.message})
-    }
-})
-
-router.get('/relationship-managers',  async (request, response) =>{
-    try {
-        const responseData = await( await DataBase.DB.query("select * from employees where role != 'telecaller'")).rows;
-        responseData[0] ? response.status(200).json({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).json({message : "Something went wrong", status : 500}).end();
-    } catch (error) {
-        response.status(404).json({message: "Error, Something went wrong while fetching RMI's", status : 404}).end();
     }
 })
 
 router.post('/update', async (request, response) => {
     try{
-        const responseData = await ( await DataBase.DB.query(`update general_insurance_transactions set policy_number = '${request.body.policy_number}', stage = '${request.body.stage}',  policy_form = '${request.body.policy_form}' where id = '${request.body.id}'`)).rows
+        const responseData = await ( await DataBase.DB.query(`update pos_general_insurance_transactions set policy_number = '${request.body.policy_number}', stage = '${request.body.stage}',  policy_form = '${request.body.policy_form}' where id = '${request.body.id}'`)).rows
         response.status(200).json({transactions_details : responseData})
     } catch(error) {
         response.status(500).json({message : 'Something went wrong, while updating transactions'})
