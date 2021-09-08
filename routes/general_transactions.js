@@ -1,16 +1,64 @@
 var router = require('express').Router();
 const DataBase = require('../Database');
 const format = require('date-fns/format');
-const { getDependentEmployees, queryFunction } = require('./helper');
+const { getDependentEmployees, queryFunction,getRenwalDate,getRenewalDate } = require('./helper');
+const dateFunction = require('date-fns');
 
 router.post('/add-transaction', async (request, response) => {
-    // console.log(request.body);
-    let valueIndex = () => {
-        return Object.values(request.body).map((item, index) => `$${index+1}`).join(', ');
-    }
     try {
-        const responseData = await ( await DataBase.DB.query(`insert into pos_general_insurance_transactions(${Object.keys(request.body).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(request.body))).rows;
-        responseData[0] ? response.status(200).json({message: 'Customer added successfully',  transaction_id: responseData[0].id}).end() : response.status(500).json({message : "Something went wrong while inserting data"})
+        console.log(request.body);
+     const customer_id = await (await DataBase.DB.query(`select customer_id,dob from pos_customers where aadhar_number = ${request.body.customer_aadhar} and pos_id = '${request.body.submitted_pos_id}'`)).rows;
+     const customerRowCount = await(await DataBase.DB.query(`select * from pos_general_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rowCount;
+    //  console.log('error',customerRowCount,request.body.premium_payment_mode,request.body.policy_issue_date);
+     let renewal_date;
+     if(customerRowCount <= 0){
+         if (request.body.premium_payment_mode === 'Monthly') {
+             renewal_date = await getRenwalDate(request.body.date_of_policy_login, 1);
+         } else if (request.body.premium_payment_mode === 'Quaterly') {
+             renewal_date = await getRenwalDate(request.body.date_of_policy_login, 3);
+         } else if (request.body.premium_payment_mode === 'Half Yearly') {
+             renewal_date = await getRenwalDate(request.body.date_of_policy_login, 6);
+         } else if (request.body.premium_payment_mode === 'Annually') {
+             renewal_date = await getRenwalDate(request.body.date_of_policy_login, 12);
+         }
+         const renewal = {
+            renewal_date: renewal_date,
+            customer_id: customer_id[0].customer_id,
+            dob : customer_id[0].dob
+        }
+        const obj = {
+            ...request.body, ...renewal
+        }
+       let valueIndex = () => {
+           return Object.values(obj).map((item, index) => `$${index+1}`).join(', ');
+       }
+           const responseData = await ( await DataBase.DB.query(`insert into pos_general_insurance_transactions(${Object.keys(obj).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(obj))).rows;
+     }else{
+         const getPolicyRenewalDate = await(await DataBase.DB.query(`select renewal_date from pos_general_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}' order by renewal_date desc limit 1`)).rows;
+        //  console.log(getPolicyRenewalDate[0].renewal_date)
+         if (request.body.premium_payment_mode === 'Monthly') {
+             renewal_date = await getRenewalDate(getPolicyRenewalDate[0].renewal_date, 1);
+         } else if (request.body.premium_payment_mode === 'Quaterly') {
+             renewal_date = await getRenewalDate(getPolicyRenewalDate[0].renewal_date, 3);
+         } else if (request.body.premium_payment_mode === 'Half Yearly') {
+             renewal_date = await getRenewalDate(getPolicyRenewalDate[0].renewal_date, 6);
+         } else if (request.body.premium_payment_mode === 'Annually') {
+             renewal_date = await getRenewalDate(getPolicyRenewalDate[0].renewal_date, 12);
+         }
+         console.log(renewal_date)
+         await(await DataBase.DB.query(`update pos_general_insurance_transactions set renewal_date = '${renewal_date}' where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rows;
+     }
+     const txn = {
+        policy_number : request.body.policy_number,
+        date_of_entry : request.body.date_of_entry,
+        renewal_date : renewal_date,
+        revenue : request.body.revenue
+    }
+    let valueIndex = () => {
+        return Object.values(txn).map((item, index) => `$${index + 1}`).join(', ');
+    }
+    const responseTxn = await (await DataBase.DB.query(`insert into pos_general_transactions(${Object.keys(txn).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(txn))).rows;
+    responseTxn[0] ? response.status(200).send({ message: 'Customer added successfully', transaction_id: responseTxn[0].txn_id }).end() : response.status(500).send({ message: "Something went wrong while inserting data" })
     } catch (error) {
         console.log(error);
         response.status(404).json({message: "Error, Something went wrong while adding transaction, please try again", status : 404}).end();

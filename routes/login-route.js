@@ -80,7 +80,7 @@ router.post('/validate-details', async(req, res) => {
 });
 
 router.post('/pos-login',async(req,res)=>{
-    console.log(req.body)
+   try {
     const {posId,password} = req.body;
     const posIdCheck = posId.indexOf('@');
     let result,posToken;
@@ -101,6 +101,9 @@ router.post('/pos-login',async(req,res)=>{
     }else{
         return res.send({message:'Failed',status:404}).end();
     }
+   } catch (error) {
+       console.log(error);
+   }
 });
 
 router.get('/loginId-username/loginId-username/:id',async(req,res)=>{

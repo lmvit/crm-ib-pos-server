@@ -2,32 +2,44 @@ const express = require('express');
 const Database = require('../Database');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const verifyToken = require('../verifyToken');
 
-router.post('/customer-details/exists',async(req,res)=>{
+router.post('/customer-details/exists',verifyToken,async(req,res)=>{
     try {
+        // console.log(req.body);
         const {aadhar,posId,pancard} = req.body;
-        const request = await(await Database.DB.query(`select aadhar_number = ${aadhar} and pancard = '${pancard}' from pos_customers where pos_id = '${posId}'`)).rows;
-        const exists = request.filter(e => {
-            if (Object.values(e).toString() === "true") {
-                return true;
-            } else return false;
-        })
-        if (exists.length > 0) {
-            res.send(`customer exists`).end();
-        } else {
-            return res.send(`not found`).end();
+        const aadharValidate = await(await Database.DB.query(`select aadhar_number = ${aadhar} from pos_customers where pos_id = '${posId}'`)).rows;
+        const panValidate = await(await Database.DB.query(`select pancard = '${pancard}' from pos_customers where pos_id = '${posId}'`)).rows;
+        // console.log(request)
+        function validate(x) {
+            let valid = false;
+            x.filter(e => {
+                if (Object.values(e).toString().includes("true")) {
+                    return valid = true;
+                }
+            })
+            return valid;
+        }
+        const aadharNumber = validate(aadharValidate);
+        const pan = validate(panValidate);
+        if (aadharNumber) {
+            return res.send({message:'Aadhar number already exists'}).end()
+        } if (pan) {
+            return res.send({message : 'Pancard number already exists'}).end()
+        }else{
+            return res.send('No duplicates found').end()
         }
     } catch (error) {
         console.log(error);
     }
 })
 
-router.post('/update-customer-details/exists',async(req,res)=>{
+router.post('/update-customer-details/exists',verifyToken,async(req,res)=>{
     try {
         const {aadhar,posId,customerId,pancard} = req.body;
         const exists = await(await Database.DB.query(`select aadhar_number = ${aadhar} and pancard = '${pancard}'  from pos_customers where pos_id = '${posId}' and customer_id != '${customerId}'`)).rows;
         if (exists) {
-            res.send(`not found`).end();
+           return res.send(`not found`).end();
         } else {
             return res.send(`customer exists`).end();
         }
@@ -36,7 +48,7 @@ router.post('/update-customer-details/exists',async(req,res)=>{
     }
 })
 
-router.post('/customer-details',async(req,res)=>{
+router.post('/customer-details',verifyToken,async(req,res)=>{
     try {
         let customerId;
         const count = await(await Database.DB.query(`select * from pos_customers`)).rowCount;
@@ -69,7 +81,7 @@ router.post('/customer-details',async(req,res)=>{
     }
 });
 
-router.get('/get-customers/:id',async(req,res)=>{
+router.get('/get-customers/:id',verifyToken,async(req,res)=>{
     try {
         res.send(await(await Database.DB.query(`select * from pos_customers where pos_id='${req.params.id}' order by customer_id`)).rows).end();
     } catch (error) {
@@ -77,7 +89,7 @@ router.get('/get-customers/:id',async(req,res)=>{
     }
 });
 
-router.get('/get-customer-details/:posId/:custId',async(req,res)=>{
+router.get('/get-customer-details/:posId/:custId',verifyToken,async(req,res)=>{
     try {
         res.send(await(await Database.DB.query(`select * from pos_customers where pos_id = '${req.params.posId}' and customer_id='${req.params.custId}'`)).rows).end();
     } catch (error) {
@@ -85,7 +97,7 @@ router.get('/get-customer-details/:posId/:custId',async(req,res)=>{
     }
 });
 
-router.put('/update-customer-details/:id/:pos',async(req,res)=>{
+router.put('/update-customer-details/:id/:pos',verifyToken,async(req,res)=>{
     try {
        const {custId,title,first_name,last_name,mobile_number,email,dob,pancard,gender,locations,branch,aadhar_number,present_address1,present_address2,present_country,present_states,present_city,present_district,present_pincode,permanent_address1,permanent_address2,permanent_district, permanent_country,permanent_states,permanent_city,permanent_pincode} = req.body;
        await(await Database.DB.query(`update pos_customers set title='${title}',first_name='${first_name}',last_name='${last_name}',mobile_number=${mobile_number},email='${email}',dob='${dob}',pancard='${pancard}',gender='${gender}',locations='${locations}',
@@ -97,7 +109,7 @@ router.put('/update-customer-details/:id/:pos',async(req,res)=>{
     }
 });
 
-router.put('/update-aadhar/:custId/:user',async(req,res)=>{
+router.put('/update-aadhar/:custId/:user',verifyToken,async(req,res)=>{
     try {
         const updated = await(await Database.DB.query(`update pos_customers set aadhar = '${req.body.aadhar}' where customer_id = '${req.params.custId}' and pos_id = '${req.params.user}'`)).rows;
         res.send(updated?"successfull":"failed").end();
@@ -106,7 +118,7 @@ router.put('/update-aadhar/:custId/:user',async(req,res)=>{
     }
 });
 
-router.put('/update-pan/:custId/:user',async(req,res)=>{
+router.put('/update-pan/:custId/:user',verifyToken,async(req,res)=>{
     try {
         const updated = await(await Database.DB.query(`update pos_customers set pan = '${req.body.pan}' where customer_id = '${req.params.custId}' and pos_id = '${req.params.user}'`)).rows;
         res.send(updated?"successfull":"failed").end();
@@ -115,7 +127,7 @@ router.put('/update-pan/:custId/:user',async(req,res)=>{
     }
 });
 
-router.put('/update-photo/:custId/:user',async(req,res)=>{
+router.put('/update-photo/:custId/:user',verifyToken,async(req,res)=>{
     try {
         const updated = await(await Database.DB.query(`update pos_customers set photo = '${req.body.photo}' where customer_id = '${req.params.custId}' and pos_id = '${req.params.user}'`)).rows;
         res.send(updated?"successfull":"failed").end();
@@ -124,7 +136,7 @@ router.put('/update-photo/:custId/:user',async(req,res)=>{
     }
 });
 
-router.put('/update-passbook/:custId/:user',async(req,res)=>{
+router.put('/update-passbook/:custId/:user',verifyToken,async(req,res)=>{
     try {
         const updated = await(await Database.DB.query(`update pos_customers set passbook = '${req.body.passbook}' where customer_id = '${req.params.custId}' and pos_id = '${req.params.user}'`)).rows;
         res.send(updated?"successfull":"failed").end();
@@ -133,7 +145,7 @@ router.put('/update-passbook/:custId/:user',async(req,res)=>{
     }
 });
 
-router.get('/get-location', async (req, res) => {
+router.get('/get-location',verifyToken,async (req, res) => {
     try {
         res.send(await (await Database.DB.query('select distinct(location) from branch')).rows).end();
     } catch (error) {
@@ -141,7 +153,7 @@ router.get('/get-location', async (req, res) => {
     }
 });
 
-router.get('/get-branches/:branch', async (req, res) => {
+router.get('/get-branches/:branch',verifyToken,async (req, res) => {
     try {
         res.send(await (await Database.DB.query(`select branch from branch where location = '${req.params.branch}'`)).rows).end();
     } catch (error) {
@@ -149,7 +161,7 @@ router.get('/get-branches/:branch', async (req, res) => {
     }
 });
 
-router.post('/pan-number', async(request, response) => {
+router.post('/pan-number',verifyToken,async(request, response) => {
     try{
         // console.log(request.body);
         const responseData = await ( await Database.DB.query(`select * from pos_customers where pancard =  '${request.body.pan_number}' and pos_id = '${request.body.pos_id}'`)).rows;

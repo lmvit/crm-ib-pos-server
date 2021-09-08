@@ -1,8 +1,7 @@
 var router = require('express').Router();
 const DataBase = require('../Database');
-const format = require('date-fns/format');
-const { getDependentEmployees, queryFunction,getDetails } = require('./helper');
-const { request, response } = require('express');
+const { getDependentEmployees, queryFunction,getDetails,getRenwalDate } = require('./helper');
+const dateFunction = require('date-fns');
 
 
 router.get('/companies',  async (request, response) =>{
@@ -11,25 +10,6 @@ router.get('/companies',  async (request, response) =>{
         responseData[0] ? response.status(200).send({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).send({message : "Something went wrong", status : 500}).end();
     } catch (error) {
         response.status(404).send({message: "Error, Something went wrong while fetching Life companies", status : 404}).end();
-    }
-})
-
-
-router.get('/relationship-managers',  async (request, response) =>{
-    try {
-        const responseData = await( await DataBase.DB.query("select * from employees where role != 'telecaller'")).rows;
-        responseData[0] ? response.status(200).send({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).send({message : "Something went wrong", status : 500}).end();
-    } catch (error) {
-        response.status(404).send({message: "Error, Something went wrong while fetching RMI's", status : 404}).end();
-    }
-})
-
-router.get('/telecallers',  async (request, response) =>{
-    try {
-        const responseData = await( await DataBase.DB.query("select * from employees where role = 'telecaller'")).rows;
-        responseData[0] ? response.status(200).send({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).send({message : "Something went wrong", status : 500}).end();
-    } catch (error) {
-        response.status(404).send({message: "Error, Something went wrong while fetching telecallers", status : 404}).end();
     }
 })
 
@@ -44,7 +24,7 @@ router.post('/products',  async (request, response) =>{
 
 router.post('/plan-type',  async (request, response) =>{
     try {
-        const responseData = await( await DataBase.DB.query(`select plan_type from lifeinsurancerevenuedetails where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}'`)).rows;
+        const responseData = await( await DataBase.DB.query(`select distinct plan_type from lifeinsurancerevenuedetails where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}'`)).rows;
         responseData[0] ? response.status(200).send({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).send({message : "Something went wrong", status : 500}).end();
     } catch (error) {
         response.status(404).send({message: "Error, Something went wrong while fetching plan names without agent", status : 404}).end();
@@ -53,7 +33,7 @@ router.post('/plan-type',  async (request, response) =>{
 
 router.post('/plan-name',  async (request, response) =>{
     try {
-        const responseData = await( await DataBase.DB.query(`select plan_name from lifeinsurancerevenuedetails where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}' and plan_type = '${request.body.plan_type}'`)).rows;
+        const responseData = await( await DataBase.DB.query(`select distinct plan_name from lifeinsurancerevenuedetails where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}' and plan_type = '${request.body.plan_type}'`)).rows;
         responseData[0] ? response.status(200).send({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).send({message : "Something went wrong", status : 500}).end();
     } catch (error) {
         response.status(404).send({message: "Error, Something went wrong while fetching plan names without agent", status : 404}).end();
@@ -71,18 +51,66 @@ router.post('/ppt-revenue',  async (request, response) =>{
 
 
 router.post('/add-transaction', async (request, response) => {
-    console.log(request.body);
-    let valueIndex = () => {
-        return Object.values(request.body).map((item, index) => `$${index+1}`).join(', ');
-    }
     try {
-        const responseData = await ( await DataBase.DB.query(`insert into pos_life_insurance_transactions(${Object.keys(request.body).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(request.body))).rows;
-        responseData[0] ? response.status(200).send({message: 'Customer added successfully',  transaction_id: responseData[0].id}).end() : response.status(500).send({message : "Something went wrong while inserting data"})
+        // console.log(request.body);
+        const customer_id = await (await DataBase.DB.query(`select customer_id,dob from pos_customers where aadhar_number = ${request.body.customer_aadhar} and pos_id = '${request.body.submitted_pos_id}'`)).rows;
+        const customerRowCount = await(await DataBase.DB.query(`select * from pos_life_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rowCount;
+        // console.log('error',customerRowCount);
+        let renewal_date = '';
+      
+        // console.log('txn',txn)
+        if(customerRowCount <= 0){
+            if (request.body.premium_payment_mode === 'Monthly') {
+                renewal_date = await getRenwalDate(request.body.policy_issue_date, 1);
+            } else if (request.body.premium_payment_mode === 'Quaterly') {
+                renewal_date = await getRenwalDate(request.body.policy_issue_date, 3);
+            } else if (request.body.premium_payment_mode === 'Half Yearly') {
+                renewal_date = await getRenwalDate(request.body.policy_issue_date, 6);
+            } else if (request.body.premium_payment_mode === 'Annually') {
+                renewal_date = await getRenwalDate(request.body.policy_issue_date, 12);
+            }const renewal = {
+                renewal_date: renewal_date,
+                customer_id: customer_id[0].customer_id,
+                dob : customer_id[0].dob
+            }
+            const obj = {
+                ...request.body, ...renewal
+            }
+           
+            let valueIndex = () => {
+                return Object.values(obj).map((item, index) => `$${index + 1}`).join(', ');
+            }
+            const responseData = await (await DataBase.DB.query(`insert into pos_life_insurance_transactions(${Object.keys(obj).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(obj))).rows;
+        }else{
+            const getPolicyRenewalDate = await(await DataBase.DB.query(`select renewal_date from pos_life_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}' order by renewal_date desc limit 1`)).rows;
+            // console.log(getPolicyRenewalDate[0].renewal_date)
+            if (request.body.premium_payment_mode === 'Monthly') {
+                renewal_date = await getRenwalDate(getPolicyRenewalDate[0].renewal_date, 1);
+            } else if (request.body.premium_payment_mode === 'Quaterly') {
+                renewal_date = await getRenwalDate(getPolicyRenewalDate[0].renewal_date, 3);
+            } else if (request.body.premium_payment_mode === 'Half Yearly') {
+                renewal_date = await getRenwalDate(getPolicyRenewalDate[0].renewal_date, 6);
+            } else if (request.body.premium_payment_mode === 'Annually') {
+                renewal_date = await getRenwalDate(getPolicyRenewalDate[0].renewal_date, 12);
+            }
+            await(await DataBase.DB.query(`update pos_life_insurance_transactions set renewal_date = '${renewal_date}' where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rows;
+        }
+        const txn = {
+            policy_number : request.body.policy_number,
+            date_of_entry : request.body.date_of_entry,
+            renewal_date : renewal_date,
+            revenue : request.body.revenue
+        }
+        let valueIndex = () => {
+            return Object.values(txn).map((item, index) => `$${index + 1}`).join(', ');
+        }
+        const responseTxn = await (await DataBase.DB.query(`insert into pos_life_transactions(${Object.keys(txn).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(txn))).rows;
+        responseTxn[0] ? response.status(200).send({ message: 'Customer added successfully', transaction_id: responseTxn[0].txn_id }).end() : response.status(500).send({ message: "Something went wrong while inserting data" })
     } catch (error) {
-        console.log('Error',error);
-        response.status(404).send({message: "Error, Something went wrong while adding transaction, please try again", status : 404}).end();
+        console.log('Error', error);
+        response.status(404).send({ message: "Error, Something went wrong while adding transaction, please try again", status: 404 }).end();
     }
-})
+});
 
 router.get("/transaction-details/:id", async (request, response) => {
     try {

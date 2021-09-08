@@ -1,5 +1,5 @@
 const DataBase = require('../Database');
-
+const dateFunction = require('date-fns');
 
 const queryFunction = (employeesArray, queryName ) => {
     if(!employeesArray){
@@ -71,4 +71,25 @@ const  getDetails = async(colName,str,posId)=>{
      return await(await DataBase.DB.query(`select * from pos_customers where ${colName} = '${str}' and pos_id = '${posId}'`)).rows;
 }
 
-module.exports = { getDependentEmployees, queryFunction, panQueryFunction,getDetails}
+const getReports = async(tableName)=>{
+    return await(await DataBase.DB.query(`SELECT SUM(revenue)/100000 as Total,date_part('month',date_of_entry) as Month
+    FROM ${tableName} WHERE date_part('year',date_of_entry) = date_part('year',current_date)
+    GROUP BY date_part('year',date_of_entry),date_part('month',date_of_entry)`)).rows
+}
+
+const getRenwalDate = async(policy_issue_date,month)=>{
+    // console.log(policy_issue_date,month);
+    // const newDate = dateFunction.addMonths(policy_issue_date,month);
+    const newDate =  dateFunction.addMonths(dateFunction.parseISO(policy_issue_date),month)
+    // console.log('date',newDate)
+    return newDate.toLocaleDateString('en-CA');
+}
+const getRenewalDate = async(policy_issue_date,month)=>{
+    console.log(policy_issue_date,month);
+    const newDate = dateFunction.addMonths(policy_issue_date,month);
+    // const newDate =  dateFunction.addMonths(dateFunction.parseISO(policy_issue_date),month)
+    console.log('date',newDate)
+    return newDate.toLocaleDateString('en-CA');
+}
+
+module.exports = { getDependentEmployees, queryFunction, panQueryFunction,getDetails,getReports,getRenwalDate,getRenewalDate}
