@@ -3,8 +3,9 @@ const express = require('express');
 const Database = require('../Database');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const verifyToken = require('../verifyToken');
 
-router.post('/register/details',async(req,res)=>{
+router.post('/register/details',verifyToken,async(req,res)=>{
     try {
         let posId;
         const count = await(await Database.DB.query(`select * from pos_details`)).rowCount;
@@ -39,7 +40,7 @@ router.post('/register/details',async(req,res)=>{
     }
 });
 
-router.post('/validate-details', async(req, res) => {
+router.post('/validate-details',verifyToken,async(req, res) => {
     try {
         const { mobile_number,email,aadhar_number,pancard,account_number } = req.body;
         const mobileQuery = await (await Database.DB.query(`select mobile_number= ${mobile_number} from pos_details`)).rows;
@@ -83,35 +84,48 @@ router.post('/pos-login',async(req,res)=>{
    try {
     const {posId,password} = req.body;
     const posIdCheck = posId.indexOf('@');
+    // console.log('pos',posIdCheck);
     let result,posToken;
-    // const user={pos_id : posId}
     if(posIdCheck >= 0){
         const getPosId = await(await Database.DB.query(`select pos_id from pos_details where email ='${posId}'`)).rows;
-       result = await (await Database.DB.query(`select email,password from pos_details where email='${posId}' and password='${password}'`)).rows;
-       console.log(getPosId)
-       const user={pos_id : getPosId[0].pos_id}
-        posToken = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET)
+        if(getPosId.length === 0){
+            result = -1;
+            return res.send({message:'failed',status:204}).end();
+        }else{
+            result = await (await Database.DB.query(`select email,password from pos_details where email='${posId}' and password='${password}'`)).rows;
+            const user={pos_id : getPosId[0].pos_id}
+            posToken = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET)
+        }
     }else{
         result = await (await Database.DB.query(`select pos_id,password from pos_details where pos_id ='${posId}' and password='${password}'`)).rows;
-        const user={pos_id:posId}
+        const user = {pos_id:posId};
         posToken = jwt.sign(user,process.env.ACCESS_TOKEN_SECRET)
     }
-    if(result.length >= 0){
+    if(result.length > 0){
         return res.send({message:'success',status:200,accessToken : posToken}).end();
     }else{
-        return res.send({message:'Failed',status:404}).end();
+        return res.send({message:'failed',status:200}).end();
     }
    } catch (error) {
        console.log(error);
    }
 });
 
-router.get('/loginId-username/loginId-username/:id',async(req,res)=>{
+router.get('/loginId-username',verifyToken,async(req,res)=>{
     try {
-        res.send(await(await Database.DB.query(`select first_name,last_name from pos_customers where pos_id = '${req.params.id}'`)).rows).end();
+        // console.log(req.body)
+        res.send(await(await Database.DB.query(`select first_name,last_name from pos_details where pos_id = '${req.body.user.pos_id}'`)).rows).end();
     } catch (error) {
         console.log(error);
     }
 });
+
+router.get('/get-pos-role',verifyToken,async(req,res)=>{
+    try {
+        res.send(await(await Database.DB.query(`select pos_id from pos_details where pos_id = '${req.body.user.pos_id}'`)).rows).end();
+    } catch (error) {
+        console.log(error);
+    }
+})
 
 module.exports = router;

@@ -9,6 +9,8 @@ const lifeTransactions = require('./routes/life_transactions');
 const generalTransactions = require('./routes/general_transactions');
 const InsuranceReports = require('./routes/pos-reports');
 const renewalReports = require('./routes/renewal-reports');
+const payouts = require('./routes/payouts');
+const authorization = require('./verifyToken');
 
 const client = Database.DB;
 Database.Connect();
@@ -19,11 +21,12 @@ app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use('/api/pos/login',posLoginRoutes);
-app.use('/api/pos/customer',posCustomerRoutes);
-app.use('/api/life-transactions',lifeTransactions);
-app.use('/api/general-transactions',generalTransactions);
-app.use('/api/pos/reports',InsuranceReports);
-app.use('/api/pos/renewal',renewalReports);
+app.use('/api/pos/customer',authorization,posCustomerRoutes);
+app.use('/api/life-transactions',authorization,lifeTransactions);
+app.use('/api/general-transactions',authorization,generalTransactions);
+app.use('/api/pos/reports',authorization,InsuranceReports);
+app.use('/api/pos/renewal',authorization,renewalReports);
+app.use('/api/payouts',authorization,payouts);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
