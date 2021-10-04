@@ -6,11 +6,9 @@ const verifyToken = require('../verifyToken');
 
 router.post('/customer-details/exists',verifyToken,async(req,res)=>{
     try {
-        // console.log(req.body);
         const {aadhar,posId,pancard} = req.body;
         const aadharValidate = await(await Database.DB.query(`select aadhar_number = ${aadhar} from pos_customers where pos_id = '${posId}'`)).rows;
         const panValidate = await(await Database.DB.query(`select pancard = '${pancard}' from pos_customers where pos_id = '${posId}'`)).rows;
-        // console.log(request)
         function validate(x) {
             let valid = false;
             x.filter(e => {

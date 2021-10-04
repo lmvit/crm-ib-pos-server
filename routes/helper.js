@@ -77,6 +77,12 @@ const getReports = async (tableName, tableName1, id) => {
       date_part('year',l.date_of_entry) = date_part('year',current_date) GROUP BY date_part('year',l.date_of_entry),date_part('month',l.date_of_entry)`)).rows
 }
 
+const getPayoutReports = async (tableName, tableName1, id,percentage) => {
+    return await (await DataBase.DB.query(`SELECT SUM(l.net_premium/100000)*${percentage} as Total,date_part('month',l.date_of_entry) as Month
+    FROM ${tableName} l inner join ${tableName1} pl on pl.policy_number = l.policy_number and pl.submitted_pos_id = '${id}' and 
+      date_part('year',l.date_of_entry) = date_part('year',current_date) GROUP BY date_part('year',l.date_of_entry),date_part('month',l.date_of_entry)`)).rows
+}
+
 const getRenwalDate = async (policy_issue_date, month) => {
     const newDate = dateFunction.addMonths(dateFunction.parseISO(policy_issue_date), month)
     return newDate.toLocaleDateString('en-CA');
@@ -129,4 +135,4 @@ const getPolicyRenewalDate = async (ppm,renewal_date) => {
             break;
     }
 }
-module.exports = { getDependentEmployees, queryFunction, panQueryFunction, getDetails, getReports, getRenwalDate, getRenewalDate, validateLifeTransactionCount, validateLifeTransactionDues, validateGeneralTransactionCount, validateGeneralTransactionDues,getPolicyRenewalDate }
+module.exports = { getDependentEmployees, queryFunction, panQueryFunction, getDetails, getReports,getPayoutReports, getRenwalDate, getRenewalDate, validateLifeTransactionCount, validateLifeTransactionDues, validateGeneralTransactionCount, validateGeneralTransactionDues,getPolicyRenewalDate }

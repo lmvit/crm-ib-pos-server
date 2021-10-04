@@ -68,6 +68,15 @@ router.get('/monthly-general-revenue-data',async(req,res)=>{
    }
 });
 
+router.get('/monthly-life-revenue-payouts',async(req,res)=>{
+   try {
+      const result = await getPayoutReports('pos_general_transactions','pos_general_insurance_transactions',req.body.user.pos_id);
+      result ? res.status(200).json({message:result}).end() : res.status(200).json({message: 'No data found'}).end();
+   } catch (error) {
+      console.log(error);
+   }
+})
+
 
 
 module.exports = router;

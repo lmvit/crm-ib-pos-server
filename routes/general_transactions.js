@@ -6,10 +6,8 @@ const dateFunction = require('date-fns');
 
 router.post('/add-transaction', async (request, response) => {
     try {
-        // console.log(request.body);
      const customer_id = await (await DataBase.DB.query(`select customer_id,dob from pos_customers where aadhar_number = ${request.body.customer_aadhar} and pos_id = '${request.body.submitted_pos_id}'`)).rows;
      const customerRowCount = await(await DataBase.DB.query(`select * from pos_general_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rowCount;
-    //  console.log('error',customerRowCount,request.body.premium_payment_mode,request.body.policy_issue_date);
      let renewal_date;
      if(customerRowCount === 0){
          if (request.body.premium_payment_mode === 'Monthly') {

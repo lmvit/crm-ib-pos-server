@@ -51,10 +51,8 @@ router.post('/ppt-revenue', async (request, response) => {
 
 router.post('/get-ppt-revenue', async (request, response) => {
     try {
-        // console.log(request.body)
         const { company_name, product_name, plan_type, plan_name, premium_payment_term } = request.body.obj;
         const responseData = await (await DataBase.DB.query(`select distinct revenue from lifeinsurancerevenuedetails where company_name = '${company_name}' and product_name = '${product_name}' and plan_type = '${plan_type}' and plan_name = '${plan_name}' and premium_payment_term='${premium_payment_term}'`)).rows;
-        // console.log(responseData);
         responseData[0] ? response.status(200).send(responseData).end() : response.status(200).send("No ppt or revenue information found").end();
     } catch (error) {
         console.log(error)
@@ -65,13 +63,11 @@ router.post('/get-ppt-revenue', async (request, response) => {
 
 router.post('/add-transaction', async (request, response) => {
     try {
-        // console.log(request.body);
         const customer_id = await (await DataBase.DB.query(`select customer_id,dob from pos_customers where aadhar_number = ${request.body.customer_aadhar} and pos_id = '${request.body.submitted_pos_id}'`)).rows;
         const customerRowCount = await (await DataBase.DB.query(`select * from pos_life_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rowCount;
         console.log('error', customerRowCount);
         let renewal_date = '';
 
-        // console.log('txn',txn)
         if (customerRowCount === 0) {
             if (request.body.premium_payment_mode === 'Monthly') {
                 renewal_date = await getRenwalDate(request.body.policy_issue_date, 1);
