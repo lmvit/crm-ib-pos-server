@@ -39,8 +39,6 @@ const panQueryFunction = (panArray) => {
     }
 }
 
-
-
 const getDependentEmployees = async (id, onlyIds) => {
     const totalEmployees = [];
     let fetchedEmployees = [];
@@ -76,11 +74,16 @@ const getReports = async (tableName, tableName1, id) => {
     FROM ${tableName} l inner join ${tableName1} pl on pl.policy_number = l.policy_number and pl.submitted_pos_id = '${id}' and 
       date_part('year',l.date_of_entry) = date_part('year',current_date) GROUP BY date_part('year',l.date_of_entry),date_part('month',l.date_of_entry)`)).rows
 }
+// life insurance payout
+const getPayoutReports = async (tableName, tableName1, id) => {
+    // console.log(tableName, tableName1, id)
+    return await (await DataBase.DB.query(`select l.*,pl.* from ${tableName} l inner join ${tableName1} pl on pl.policy_number = l.policy_number and pl.submitted_pos_id = '${id}' and
+    (l.status = 'Approved' and l.type_of_business = 'New Business' or (l.type_of_business = '1 year' and l.status = 'Approved')) and date_part('year',l.date_of_entry) = date_part('year',current_date)`)).rows
+}
 
-const getPayoutReports = async (tableName, tableName1, id,percentage) => {
-    return await (await DataBase.DB.query(`SELECT SUM(l.net_premium/100000)*${percentage} as Total,date_part('month',l.date_of_entry) as Month
-    FROM ${tableName} l inner join ${tableName1} pl on pl.policy_number = l.policy_number and pl.submitted_pos_id = '${id}' and 
-      date_part('year',l.date_of_entry) = date_part('year',current_date) GROUP BY date_part('year',l.date_of_entry),date_part('month',l.date_of_entry)`)).rows
+const getGeneralPayoutReports = async (tableName, tableName1, id) => {
+    // console.log(tableName, tableName1, id)
+    return await (await DataBase.DB.query(`select g.*,gl.* from ${tableName} g inner join ${tableName1} gl on gl.policy_number = g.policy_number and gl.submitted_pos_id = '${id}' and (g.status = 'Approved' and g.type_of_business = 'New Business' or (g.type_of_business = 'renewal' and g.status = 'Approved')) and date_part('year',g.date_of_entry) = date_part('year',current_date)`)).rows
 }
 
 const getRenwalDate = async (policy_issue_date, month) => {
@@ -104,8 +107,8 @@ const validateGeneralTransactionCount = async (colName, str, posId) => {
     return await (await DataBase.DB.query(`select count(*) from pos_general_insurance_transactions pgi inner join pos_general_transactions pg on pgi.policy_number = pg.policy_number where pgi.submitted_pos_id = '${posId}' and pgi.${colName} = '${str}'`)).rows;
 }
 
-const validateGeneralTransactionDues = async (colName, str, posId) => {
-    return await (await DataBase.DB.query(`select pg.premium_payment_mode,pgi.renewal_date from pos_general_transactions pg inner join pos_general_insurance_transactions pgi on pg.policy_number = pgi.policy_number where pgi.submitted_pos_id = '${posId}' and pgi.${colName} = '${str}'`)).rows
+const validateGeneralTransactionDues = async ( str, posId) => {
+    return await (await DataBase.DB.query(`select pg.premium_payment_mode,pgi.renewal_date from pos_general_transactions pg inner join pos_general_insurance_transactions pgi on pg.policy_number = pgi.policy_number where pgi.submitted_pos_id = '${posId}' and pgi.policy_number = '${str}'`)).rows
 }
 
 const getPolicyRenewalDate = async (ppm,renewal_date) => {
@@ -135,4 +138,4 @@ const getPolicyRenewalDate = async (ppm,renewal_date) => {
             break;
     }
 }
-module.exports = { getDependentEmployees, queryFunction, panQueryFunction, getDetails, getReports,getPayoutReports, getRenwalDate, getRenewalDate, validateLifeTransactionCount, validateLifeTransactionDues, validateGeneralTransactionCount, validateGeneralTransactionDues,getPolicyRenewalDate }
+module.exports = {getDependentEmployees, queryFunction, panQueryFunction, getDetails, getReports,getPayoutReports,getGeneralPayoutReports, getRenwalDate, getRenewalDate, validateLifeTransactionCount, validateLifeTransactionDues, validateGeneralTransactionCount, validateGeneralTransactionDues,getPolicyRenewalDate}

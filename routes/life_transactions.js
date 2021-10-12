@@ -18,6 +18,7 @@ router.post('/products', async (request, response) => {
         const responseData = await (await DataBase.DB.query(`select product_name from lifeinsuranceproduct where company_name = '${request.body.company_name}'`)).rows;
         responseData[0] ? response.status(200).send({ message: "Customer exist", status: 200, data: responseData }).end() : response.status(200).send({ message: "Something went wrong", status: 500 }).end();
     } catch (error) {
+        // console.log(error);
         response.status(404).send({ message: "Error, Something went wrong while fetching Life products", status: 404 }).end();
     }
 })
@@ -65,7 +66,7 @@ router.post('/add-transaction', async (request, response) => {
     try {
         const customer_id = await (await DataBase.DB.query(`select customer_id,dob from pos_customers where aadhar_number = ${request.body.customer_aadhar} and pos_id = '${request.body.submitted_pos_id}'`)).rows;
         const customerRowCount = await (await DataBase.DB.query(`select * from pos_life_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rowCount;
-        console.log('error', customerRowCount);
+        const getPosRate = await(await DataBase.DB.query(`select revenue from pos_life_insurance_revenue_details where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}' and plan_type = '${request.body.plan_type}'and  plan_name = '${request.body.plan_name}' and premium_payment_term =${request.body.premium_payment_term} and status = 'T'`)).rows;
         let renewal_date = '';
 
         if (customerRowCount === 0) {
@@ -94,13 +95,14 @@ router.post('/add-transaction', async (request, response) => {
                 policy_number: request.body.policy_number,
                 policy_issue_date: request.body.policy_issue_date,
                 premium_payment_term: request.body.premium_payment_term,
-                date_of_entry: request.body.date_of_entry,
+                // date_of_entry: request.body.date_of_entry,
                 revenue: request.body.revenue,
                 customer_mobile: request.body.customer_mobile,
                 customer_aadhar: request.body.customer_aadhar,
                 customer_pan: request.body.customer_pan,
                 customer_name: request.body.customer_name,
-                submitted_pos_id: request.body.submitted_pos_id
+                submitted_pos_id: request.body.submitted_pos_id,
+                pos_rate : getPosRate[0].revenue
             }
             const obj = {
                 ...requestObj, ...renewal
@@ -162,7 +164,6 @@ router.get("/transaction-details/:id", async (request, response) => {
         const responseData = await (await DataBase.DB.query(`select * from pos_life_insurance_transactions where id = ${request.params.id}`)).rows;
         responseData[0] ? response.status(200).send({ message: "Customer exist", transactionDetails: responseData[0] }).end() : response.status(500).send({ message: "Something went wrong" }).end();
     } catch (error) {
-        console.log(error)
         response.status(404).json({ message: "Error, Something went wrong while adding transaction, please try again", status: 404 }).end();
     }
 })
@@ -186,13 +187,6 @@ router.post('/update', async (request, response) => {
     }
 })
 
-router.get('/dependent-transactions/:id', async (request, response) => {
-    const employees = await getDependentEmployees(request.params.id);
-    const responseData = await (await DataBase.DB.query(`select * from life_insurance_transactions where ${queryFunction(employees, 'submitted_employee_id')}`)).rows;
-    response.status(200).json(responseData);
-
-})
-
 router.post('/transactions-between-dates/:id', async (request, response) => {
     try {
         const pos_id = request.params.id;
@@ -205,10 +199,10 @@ router.post('/transactions-between-dates/:id', async (request, response) => {
     }
 })
 
-router.get('/customer-details/:id/:posId', async (request, response) => {
+router.get('/customer-details/:id', async (request, response) => {
     try {
         const str = request.params.id;
-        const posId = request.params.posId
+        const posId = request.body.user.pos_id;
         if (str.length === 12 && str.match(/^[2-9]{1}[0-9]{3}[0-9]{4}[0-9]{4}$/)) {
             const result = await getDetails('aadhar_number', str, posId);
             result.length > 0 ? response.status(200).json({ message: "customer exists", data: result }).end() : response.status(200).json({ message: "customer aadhar number not exists" }).end();
@@ -273,5 +267,15 @@ router.get('/check-transaction-dues/:input', async (request, response) => {
     } catch (error) {
         console.log(error);
     }
-})
+});
+
+router.get('/get-life-insurance-policy-details/:id',async(req,res)=>{
+    try {
+        const result = await(await DataBase.DB.query(`select pl.*,p.* from pos_life_insurance_transactions pl inner join pos_life_transactions p on p.policy_number = pl.policy_number where customer_pan = '${req.params.id}' and submitted_pos_id = '${req.body.user.pos_id}'`)).rows;
+        result ? res.send(result).end() : res.send('Transaction details not exists').end();
+    } catch (error) {
+        console.log(error);
+    }
+});
+
 module.exports = router;

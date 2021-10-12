@@ -5,10 +5,10 @@ const Database = require('../Database');
 const addDateFunction = require('date-fns/addDays');
 const addMonthFunction = require('date-fns');
 
-router.get('/get-records/:name/:name1/:id',async(request,response)=>{
+router.get('/get-records/:name/:name1',async(request,response)=>{
    try {
       let renewalDateNotification;
-      const result = await(await Database.DB.query(`select li.*,lit.* from ${request.params.name} lit,${request.params.name1} li where li.policy_number = lit.policy_number and lit.submitted_pos_id = '${request.params.id}'`)).rows;
+      const result = await(await Database.DB.query(`select li.*,lit.* from ${request.params.name} lit,${request.params.name1} li where li.policy_number = lit.policy_number and lit.submitted_pos_id = '${request.body.user.pos_id}'`)).rows;
       const resData = result.filter((customer,index)=>{
          const date = new Date(result[index].renewal_date);
          let getPremiumPaymentMode = result[index].premium_payment_mode;

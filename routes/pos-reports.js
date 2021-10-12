@@ -2,7 +2,7 @@ const { response } = require('express');
 const express = require('express');
 const router = express.Router();
 const DataBase = require('../Database');
-const { getReports } = require('./helper');
+const { getReports,getPayoutReports,getGeneralPayoutReports } = require('./helper');
 
 router.get('/get-life-insurance-pos-reports/:fromDate/:toDate',async(request,response)=>{
    try {
@@ -70,8 +70,27 @@ router.get('/monthly-general-revenue-data',async(req,res)=>{
 
 router.get('/monthly-life-revenue-payouts',async(req,res)=>{
    try {
+      const result = await getPayoutReports('pos_life_transactions','pos_life_insurance_transactions',req.body.user.pos_id);
+      const arr = new Array(12).fill(0);
+      result.map((element,index)=>{
+         const month = new Date(element.date_of_entry).getMonth();
+         arr[month] += (element.net_premium * (element.pos_rate /100))/100000;
+      })
+      result ? res.status(200).send(arr).end() : res.status(200).json({message: 'No data found'}).end();
+   } catch (error) {
+      console.log(error);
+   }
+});
+
+router.get('/monthly-general-revenue-payouts',async(req,res)=>{
+   try {
       const result = await getPayoutReports('pos_general_transactions','pos_general_insurance_transactions',req.body.user.pos_id);
-      result ? res.status(200).json({message:result}).end() : res.status(200).json({message: 'No data found'}).end();
+      const arr = new Array(12).fill(0);
+      result.map((element,index)=>{
+         const month = new Date(element.date_of_entry).getMonth();
+         arr[month] += (element.net_premium * (element.pos_rate /100))/100000;
+      })
+      result ? res.status(200).send(arr).end() : res.status(200).json({message: 'No data found'}).end();
    } catch (error) {
       console.log(error);
    }

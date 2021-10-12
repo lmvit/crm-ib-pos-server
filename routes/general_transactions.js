@@ -6,10 +6,13 @@ const dateFunction = require('date-fns');
 
 router.post('/add-transaction', async (request, response) => {
     try {
+        // console.log(request.body);
      const customer_id = await (await DataBase.DB.query(`select customer_id,dob from pos_customers where aadhar_number = ${request.body.customer_aadhar} and pos_id = '${request.body.submitted_pos_id}'`)).rows;
      const customerRowCount = await(await DataBase.DB.query(`select * from pos_general_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}'`)).rowCount;
+     const getPosRate = await(await DataBase.DB.query(`select revenue from pos_general_insurance_revenue_details where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}' and plan_type = '${request.body.plan_type}'and  plan_name = '${request.body.plan_name}' and type_of_insurance ='${request.body.type_of_insurance}' and status = 'T'`)).rows;
+    //  console.log('get',getPosRate);
      let renewal_date;
-     if(customerRowCount === 0){
+     if(request.body.type_of_business === 'New Business'){
          if (request.body.premium_payment_mode === 'Monthly') {
              renewal_date = await getRenwalDate(request.body.date_of_policy_login, 1);
          } else if (request.body.premium_payment_mode === 'Quaterly') {
@@ -38,13 +41,14 @@ router.post('/add-transaction', async (request, response) => {
             policy_tenure: request.body.policy_tenure,
             date_of_policy_login: request.body.date_of_policy_login,
             // premium_payment_mode: request.body.premium_payment_mode,
-            date_of_entry: request.body.date_of_entry,
+            // date_of_entry: request.body.date_of_entry,
             revenue: request.body.revenue,
             customer_mobile: request.body.customer_mobile,
             customer_aadhar: request.body.customer_aadhar,
             customer_pan: request.body.customer_pan,
             customer_name: request.body.customer_name,
-            submitted_pos_id:request.body.submitted_pos_id 
+            submitted_pos_id:request.body.submitted_pos_id,
+            pos_rate : getPosRate[0].revenue
         }
         const obj = {
             ...requestObj, ...renewal
@@ -53,7 +57,7 @@ router.post('/add-transaction', async (request, response) => {
            return Object.values(obj).map((item, index) => `$${index+1}`).join(', ');
        }
            const responseData = await ( await DataBase.DB.query(`insert into pos_general_insurance_transactions(${Object.keys(obj).join(', ')}) values (${valueIndex()} ) returning *`, Object.values(obj))).rows;
-     }else{
+     }else if(request.body.type_of_business === 'renewal'){
          const getPolicyRenewalDate = await(await DataBase.DB.query(`select renewal_date from pos_general_insurance_transactions where customer_aadhar =${request.body.customer_aadhar} and submitted_pos_id='${request.body.submitted_pos_id}' order by renewal_date desc limit 1`)).rows;
         //  console.log(getPolicyRenewalDate[0].renewal_date)
          if (request.body.premium_payment_mode === 'Monthly') {
@@ -135,7 +139,7 @@ router.post('/products',  async (request, response) =>{
 
 router.post('/type-of-insurance',  async (request, response) =>{
     try {
-        const responseData = await( await DataBase.DB.query(`select  type_of_insurance from generalinsurancerevenuedetails where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}'`)).rows;
+        const responseData = await( await DataBase.DB.query(`select type_of_insurance from generalinsurancerevenuedetails where company_name = '${request.body.company_name}' and product_name = '${request.body.product_name}'`)).rows;
         responseData[0] ? response.status(200).json({message: "Customer exist", status: 200, data: responseData}).end() :  response.status(200).json({message : "Something went wrong", status : 500}).end();
     } catch (error) {
         response.status(404).json({message: "Error, Something went wrong while fetching type of  insurance without agent", status : 404}).end();
@@ -230,31 +234,83 @@ router.get('/check-transaction-dues/:input', async (request, response) => {
     try {
         const posId = request.body.user.pos_id;
         const str = request.params.input;
-        if (str.length === 12 && str.match(/^[2-9]{1}[0-9]{3}[0-9]{4}[0-9]{4}$/)) {
-            const result = await validateGeneralTransactionDues('customer_aadhar', str, posId);
+        // if (str.length === 12 && str.match(/^[2-9]{1}[0-9]{3}[0-9]{4}[0-9]{4}$/)) {
+            const result = await validateGeneralTransactionDues(str, posId);
             const ppm = result[0].premium_payment_mode;
             const renewal_date = result[0].renewal_date;
             const getRenewalDate = await getPolicyRenewalDate(ppm, renewal_date);
             getRenewalDate ? response.status(200).json({renewalDate : getRenewalDate}).end() : response.status(200).json({message:"customer aadhar number not exists"}).end();
-        } else if (str.length === 10 && str.match(/^[6-9]\d{9}$/)) {
-            const result = await validateGeneralTransactionDues('customer_mobile', str, posId);
-            const ppm = result[0].premium_payment_mode;
-            const renewal_date = result[0].renewal_date;
-            const getRenewalDate = await getPolicyRenewalDate(ppm, renewal_date);
-            getRenewalDate ? response.status(200).json({renewalDate : getRenewalDate}).end() : response.status(200).json({message:"customer mobile number not exists"}).end();
-        } else if (str.length === 10 && str.match(/^[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}$/)) {
-            const result = await validateGeneralTransactionDues('customer_pan', str, posId);
-            const ppm = result[0].premium_payment_mode;
-            const renewal_date = result[0].renewal_date;
-            const getRenewalDate = await getPolicyRenewalDate(ppm, renewal_date);
-            getRenewalDate ? response.status(200).json({renewalDate : getRenewalDate}).end() : response.status(200).json({message:"customer pancard number not exists"}).end();
-        }
+        // } else if (str.length === 10 && str.match(/^[6-9]\d{9}$/)) {
+        //     const result = await validateGeneralTransactionDues('customer_mobile', str, posId);
+        //     const ppm = result[0].premium_payment_mode;
+        //     const renewal_date = result[0].renewal_date;
+        //     const getRenewalDate = await getPolicyRenewalDate(ppm, renewal_date);
+        //     getRenewalDate ? response.status(200).json({renewalDate : getRenewalDate}).end() : response.status(200).json({message:"customer mobile number not exists"}).end();
+        // } else if (str.length === 10 && str.match(/^[a-zA-Z]{5}[0-9]{4}[a-zA-Z]{1}$/)) {
+        //     const result = await validateGeneralTransactionDues('customer_pan', str, posId);
+        //     const ppm = result[0].premium_payment_mode;
+        //     const renewal_date = result[0].renewal_date;
+        //     const getRenewalDate = await getPolicyRenewalDate(ppm, renewal_date);
+            // getRenewalDate ? response.status(200).json({renewalDate : getRenewalDate}).end() : response.status(200).json({message:"customer pancard number not exists"}).end();
+        // }
     } catch (error) {
         console.log(error);
     }
-}) 
+});
 
+router.get('/get-general-insurance-policy-details/:id',async(req,res)=>{
+    try {
+        const result = await(await DataBase.DB.query(`select pg.*,p.* from pos_general_insurance_transactions pg inner join pos_general_transactions p on p.policy_number = pg.policy_number where pg.policy_number = '${req.params.id}' and pg.submitted_pos_id = '${req.body.user.pos_id}'`)).rows;
+        result ? res.send(result).end() : res.send('Transaction details not exists').end();
+    } catch (error) {
+        console.log(error);
+    }
+});
 
+router.get('/get-customer-policies/:number',async(request,response)=>{
+    try {
+        const result = await(await DataBase.DB.query(`select pgi.*,pg.* from pos_general_insurance_transactions pgi inner join pos_general_transactions pg on pg.policy_number = pgi.policy_number where customer_pan = '${request.params.number}' and pgi.submitted_pos_id = '${request.body.user.pos_id}'`)).rows;
+        result ? response.send(result).end() : response.send('No data found').end();
+    } catch (error) {
+        console.log(error);
+    }
+});
 
+router.get('/get-policy-count/:number',async(request,response)=>{
+    try {
+        const result = await(await DataBase.DB.query(`select count(*) from pos_general_insurance_transactions pgi inner join pos_general_transactions pg on pg.policy_number = pgi.policy_number where pg.policy_number = '${request.params.number}' and pgi.submitted_pos_id = '${request.body.user.pos_id}'`)).rows;
+        result ? response.send(result).end(): response.send('No data found').end();
+    } catch (error) {
+        console.log(error);
+    }
+});
+
+router.get('/get-policy-count-by-pan/:number',async(request,response)=>{
+    try {
+        const result = await(await DataBase.DB.query(`select count(*) from pos_general_insurance_transactions where customer_pan ='${request.params.number}' and submitted_pos_id = '${request.body.user.pos_id}'`)).rows;
+        result ? response.send(result).end(): response.send('No data found').end();
+    } catch (error) {
+        console.log(error);
+    }
+});
+
+router.get('/get-general-last-transaction/:number',async(request,response)=>{
+    try {
+        const result = await(await DataBase.DB.query(`select g.*,gl.* from pos_general_transactions g inner join pos_general_insurance_transactions gl on gl.policy_number = g.policy_number where gl.customer_pan = '${request.params.number}' and gl.submitted_pos_id = '${request.body.user.pos_id}' order by id desc limit 1`)).rows;
+        result ? response.send(result).end(): response.send('No data found').end();
+    } catch (error) {
+        console.log(error);
+    }
+});
+
+router.get('/update-policy-rollover-or-cancelled/:number/:business',async(request,response)=>{
+    try {
+        const generalTransactions = await(await DataBase.DB.query(`update pos_general_insurance_transactions set renewal_date = null where policy_number = '${request.params.number}' and submitted_pos_id = '${request.body.user.pos_id}'`)).rows;
+        const generalInsuranceTransactions = await (await DataBase.DB.query(`update pos_general_transactions set type_of_business = '${request.params.business}' where policy_number = '${request.params.number}'`)).rows;
+        generalTransactions && generalInsuranceTransactions ? response.send(`Policy number is successfully ${request.params.business}`).end() : response.send('failed').end();
+    } catch (error) {
+        console.log(error);
+    }
+})
 
 module.exports = router;

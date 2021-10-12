@@ -11,6 +11,7 @@ const InsuranceReports = require('./routes/pos-reports');
 const renewalReports = require('./routes/renewal-reports');
 const payouts = require('./routes/payouts');
 const authorization = require('./verifyToken');
+const otpAuthentication = require('./routes/auth');
 
 const client = Database.DB;
 Database.Connect();
@@ -27,6 +28,7 @@ app.use('/api/general-transactions',authorization,generalTransactions);
 app.use('/api/pos/reports',authorization,InsuranceReports);
 app.use('/api/pos/renewal',authorization,renewalReports);
 app.use('/api/payouts',authorization,payouts);
+app.use('/api/otp-auth',authorization,otpAuthentication);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
